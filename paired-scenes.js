@@ -1,0 +1,25 @@
+// Pair each visual with its own copy; background changes are not a second visual concept.
+const pairedScenePrompt=scenePrompt,pairedSceneContent=content;
+function sectionForScene(x,i){return x.codexResult?.sections?.[i]||null}
+function sectionStory(x,i){const s=sectionForScene(x,i),heading=[s?.title,s?.notesTitle].filter(Boolean).join(' ');const planning=/imprint|customiz|customis|order|planning|buyer checklist|artwork/i.test(heading);return {planning,label:planning?'定制方案确认：产品与英文 Logo 平面稿对照，不做孤立细节特写':`表达「${s?.title||'该组文案'}」的核心意思，按内容决定构图`}}
+function sectionImageBrief(x,i){const s=sectionForScene(x,i);if(sectionStory(x,i).planning)return 'Communicate CUSTOMIZATION / ORDER PREPARATION as a coherent scene: show the actual reference product in a considered layout alongside a simple English YOUR LOGO artwork proof, so the viewer can understand reviewing branding before ordering. Keep the full identity of the product readable. A hand reviewing the proof may appear if useful. Use additional product colors ONLY when those exact variants are supplied in reference images, otherwise keep one verified variant. Do not invent print dimensions, rulers, technical drawings, placement guarantees, included packaging or production equipment. Props are planning aids, not included accessories. Do NOT replace this planning story with an isolated macro of stitches, material texture or the logo. The image must make sense beside the exact section text below.';return `First read the exact corresponding website section below and select ONE central, visually demonstrable idea. Decide the scene, subjects, interaction and framing from that idea, not from whether this is image 1 or image 2. The viewer should understand what the section means by looking at the image. ${s?.imageBrief?'Existing concept, use only if it still matches the current copy: '+s.imageBrief:''} A close-up is appropriate only when the copy itself focuses on a physical detail. Do not add functions, capacity evidence or accessories not supported by product references. Make a different informational contribution from the other image, not merely different surroundings.`}
+function sectionPromptContext(s){if(!s)return 'Website copy has not been generated yet. Use verified product facts only; do not invent a message or benefit.';return [s.title,...(s.paragraphs||[]),s.notesTitle,...(s.bullets||[])].filter(Boolean).join('\n')}
+scenePrompt=function(x,i){const current=sectionForScene(x,i),other=sectionForScene(x,1-i);const brief=sectionImageBrief(x,i);const local={...x,scenes:[...(x.scenes||['',''])]};local.scenes[i]=[brief,x.scenes?.[i]?'Additional user direction: '+x.scenes[i]:''].filter(Boolean).join('\n');return pairedScenePrompt(local,i)+`
+
+COPY-TO-IMAGE ALIGNMENT — REQUIRED:
+This is illustration ${i+1} for website section ${i+1}. The following text is context, NOT text to print on the image:
+${sectionPromptContext(current)}
+
+VISUAL OBJECTIVE:
+${sectionStory(x,i).planning?'Show the buyer reviewing a customization / order plan, rather than merely showing a printed logo.':`Visually communicate the central meaning of "${current?.title||'this section'}". Select composition based on that meaning. Do not impose a lifestyle/macro split.`}
+
+COMPLEMENTARY PAIR — REQUIRED:
+The OTHER section is about:
+${sectionPromptContext(other)}
+The other image direction is:
+${sectionImageBrief(x,1-i)}
+Your image must add different information. Different surroundings, props, camera angle, crop or lighting ALONE do not establish a second concept. The section's central message determines the image type; image number does not. A use story, a customization-planning scene, a color-selection scene and a material study are distinct concepts, not interchangeable. Do not repeat the complete product sitting on a cafe table merely to change the location. Do not use an isolated physical detail to illustrate a section about planning an order. This alignment rule takes priority over an older brief or habit of always making image 2 a macro.
+If generating in the same ChatGPT conversation, treat the previous image as a duplication check, not as a composition to imitate. Use the uploaded original product references for product fidelity.
+Check before rendering: (1) communicates the corresponding section, (2) differs in informational purpose from the other image, (3) adds no unsupported features, sizes, printing positions or contents, (4) contains no website body copy. Render the image after this internal check.`};
+content=function(n){let html=pairedSceneContent(n);if(n!==2)return html;html=html.replace('场景 1 · 使用场景与推广','配图 1 · 对应第一组文案').replace('场景 2 · 细节与定制','配图 2 · 对应第二组文案');for(const i of [0,1]){const s=sectionForScene(p(),i);const marker=`<label for="brief-${i}">`;html=html.replace(marker,`<p class="mini"><b>对应文案：</b>${esc(s?.title||'尚未生成')}<br><b>画面重点：</b>${esc(sectionStory(p(),i).label)}</p><details><summary>查看推荐画面方向</summary><p class="mini">${esc(sectionImageBrief(p(),i))}</p></details>${marker}`)}return html};
+render();

@@ -1,0 +1,11 @@
+// Exact decimal-to-fraction conversion. Never round physical dimensions.
+function decimalInchFraction(value){const match=String(value).match(/^(\d+)\.(\d+)$/);if(!match)return value;let numerator=BigInt(match[1]+match[2]),denominator=10n**BigInt(match[2].length);const gcd=(a,b)=>b?gcd(b,a%b):a;const d=gcd(numerator,denominator);numerator/=d;denominator/=d;const whole=numerator/denominator,rest=numerator%denominator;return rest?(whole?`${whole} ${rest}/${denominator}`:`${rest}/${denominator}`):`${whole}`}
+function formatInches(text){return String(text??'').replace(/\b(\d+\.\d+)(\s*(?:["″”]|inches\b|inch\b|in\b\.?))/gi,(_,n,u)=>decimalInchFraction(n)+u)}
+function normalizeProductInches(x){for(const key of ['dimensions','imprint','imprintArea'])if(typeof x[key]==='string')x[key]=formatInches(x[key]);if(x.codexResult){for(const key of ['dimensions','imprint','imprintArea'])if(typeof x.codexResult.fields?.[key]==='string')x.codexResult.fields[key]=formatInches(x.codexResult.fields[key]);for(const s of x.codexResult.sections||[]){if(s.title)s.title=formatInches(s.title);if(s.paragraphs)s.paragraphs=s.paragraphs.map(formatInches);if(s.bullets)s.bullets=s.bullets.map(formatInches)}}}
+const fractionEditor=editor,fractionBind=bind;
+editor=function(){normalizeProductInches(p());return fractionEditor()};
+bind=function(){fractionBind();if(page!=='editor')return;for(const key of ['dimensions','imprint']){const el=$('#compact-'+key);if(!el)continue;el.addEventListener('change',()=>{p()[key]=formatInches(el.value);el.value=p()[key];persist()});const b=document.querySelector(`[data-fast-copy="${key}"]`);b?.addEventListener('click',e=>{e.stopImmediatePropagation();p()[key]=formatInches(el.value);el.value=p()[key];persist();copySceneText(el.value)},true)}};
+const fractionScenePrompt=scenePrompt,fractionRepairPrompt=repairPrompt;
+scenePrompt=function(x,i){normalizeProductInches(x);return formatInches(fractionScenePrompt(x,i))+'\nDIMENSION NOTATION: All inch measurements must use exact reduced fractions or mixed numbers, never decimal inches. Preserve the verified SAGE values; do not approximate to another denominator.'};
+repairPrompt=function(x,i){normalizeProductInches(x);return formatInches(fractionRepairPrompt(x,i))};
+for(const x of products)normalizeProductInches(x);persist();render();
