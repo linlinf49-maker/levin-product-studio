@@ -34,7 +34,7 @@ sent.set(x,signature(snapshot));x.sharedFingerprint=SharedStore.fingerprint({...
 if(!products.some(x=>conflicts.has(x)))status('已自动同步');retryAt=0;
 }catch(e){if(/版本已变化/.test(e.message)){for(const x of products)if(eligible(x)&&sent.get(x)!==signature(x))conflicts.add(x);status('同步版本冲突，本机修改已保留，请核对')}else{retryAt=Date.now()+15000;status('已保存本机，同步未完成：'+e.message)}}finally{applying=false;busy=false}}
 let pendingTimer;
-document.addEventListener('input',e=>{if(page!=='editor'||!e.target.closest('#app'))return;clearTimeout(pendingTimer);pendingTimer=setTimeout(()=>{if(page==='editor'){p().updated=new Date().toLocaleString('zh-CN');persist();sync()}},600)});
+document.addEventListener('input',e=>{if(page!=='editor'||!e.target.closest('#app'))return;const target=p();clearTimeout(pendingTimer);pendingTimer=setTimeout(()=>{target.updated=new Date().toLocaleString('zh-CN');target.lastEditedAt=new Date().toISOString();persist();sync()},600)});
 document.addEventListener('change',e=>{if(page!=='editor'||!e.target.closest('#app'))return;setTimeout(()=>{persist();sync()},0)},true);
 window.addEventListener('pagehide',()=>{try{persistNow()}catch{}});
 window.addEventListener('online',()=>{retryAt=0;sync()});

@@ -1,6 +1,12 @@
 // One focused product workspace; existing actions and storage remain in use.
 function productListTime(x){
-for(const value of [x.createdAt,x.created_at,x.sharedUpdatedAt,x.updated]){if(!value)continue;const time=typeof value==='number'?value:Date.parse(String(value).replace(/年|月/g,'/').replace(/日/g,''));if(Number.isFinite(time))return time}return 0;
+// Sync/import timestamps do not mean the product was edited recently.
+const times=[x.lastEditedAt,x.updated,x.createdAt,x.created_at].map(value=>{
+if(!value)return 0;if(typeof value==='number')return Number.isFinite(value)?value:0;
+const text=String(value).trim(),match=text.match(/^(\d{4})[\/年.-](\d{1,2})[\/月.-](\d{1,2})日?\s*(上午|下午)?\s*(\d{1,2})?[:：]?(\d{2})?[:：]?(\d{2})?$/);
+if(match){let hour=Number(match[5]||0);if(match[4]==='下午'&&hour<12)hour+=12;if(match[4]==='上午'&&hour===12)hour=0;return Date.UTC(+match[1],+match[2]-1,+match[3],hour,+(match[6]||0),+(match[7]||0))-8*60*60*1000}
+const parsed=Date.parse(text);return Number.isFinite(parsed)?parsed:0});
+return Math.max(0,...times);
 }
 list=function(){
 const items=products.map((x,i)=>({x,i})).filter(({x})=>(x.id+' '+x.name).toLowerCase().includes(search.toLowerCase())&&(filter==='all'||x.status===filter)).sort((a,b)=>productListTime(b.x)-productListTime(a.x)||b.i-a.i);
