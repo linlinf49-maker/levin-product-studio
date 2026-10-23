@@ -31,7 +31,7 @@ body.products-home{font-size:16px;line-height:1.55}
 .home-utilities[hidden]{display:none}
 .home-utility-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .home-utility-heading h2{font-size:21px;margin:0}
-.home-utility-grid{display:grid;grid-template-columns:1fr 1.2fr .8fr;gap:28px}
+.home-utility-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:28px}
 .home-utility-grid>section+section{border-left:1px solid var(--line);padding-left:28px}
 .home-utility-grid h3{font-size:17px;margin-bottom:12px}
 .home-utility-grid p{font-size:15px;color:var(--muted);margin:0 0 16px}

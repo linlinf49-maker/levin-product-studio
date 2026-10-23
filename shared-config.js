@@ -1,6 +1,6 @@
 // Public connection settings only. Never put passwords, service_role or secret keys here.
 globalThis.LEVIN_SHARED_CONFIG = globalThis.LEVIN_SHARED_CONFIG || {
-  url: '',
-  publishableKey: '',
+  url: 'https://jpfglnkqdfbywpmwxucw.supabase.co',
+  publishableKey: 'sb_publishable_0UTY_-MbWGXvHKCq0F1TOg_e4mga4sW',
   bucket: 'levin-products'
 };
