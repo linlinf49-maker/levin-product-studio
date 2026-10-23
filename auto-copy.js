@@ -3,8 +3,9 @@ const activeCopyJobs=new WeakMap();
 editor=function(){let html=autoCopyEditor();return html.replace('<h2>Product Information</h2>',`<h2>Product Information</h2><button id="generate-product-copy" class="primary" ${activeCopyJobs.has(p())?'disabled':''}>${activeCopyJobs.has(p())?'正在生成…':p().codexResult?.sections?.length?'重新生成文案':'生成两组英文文案'}</button>`)};
 async function generateCurrentCopy(target,force=false){if(activeCopyJobs.has(target))return;if(!target.name||!target.description||target.description.length<30)return;if(!force&&target.codexResult?.sections?.length)return;
  if(location.protocol==='https:'){
+  if(['queued','running'].includes(target.copyGenerationRequest?.state)&&Date.now()-Date.parse(target.copyGenerationRequest.startedAt||target.copyGenerationRequest.requestedAt)<360000)return toast('当前任务正在处理，请勿重复提交；完成后自动显示');
   if(!localStorage.getItem('levin-record-access-v1'))return toast('请通过专用工作区链接打开，才能提交生成任务');
-  target.copyGenerationRequest={id:crypto.randomUUID(),state:'queued',requestedAt:new Date().toISOString()};delete target.copyGenerationError;persist();render();toast('已提交文案与 SEO 生成；由负责人电脑处理，完成后自动回填');return;
+  target.copyGenerationRequest={id:crypto.randomUUID(),state:'queued',requestedAt:new Date().toISOString()};delete target.copyGenerationError;persist();render();toast('已提交，等待生成服务接收；接收后会显示生成中');return;
  }
  const signature=JSON.stringify([target.id,target.name,target.description,target.colors,target.imprint]);
  try{activeCopyJobs.set(target,'starting');if(p()===target&&page==='editor')render();const response=await localRequest('/api/copy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product:target})});activeCopyJobs.set(target,response.job);toast('正在根据当前产品资料生成英文文案…');
@@ -14,8 +15,17 @@ bind=function(){autoCopyBind();$('#generate-product-copy')?.addEventListener('cl
 // Stop the previous SKU-specific injection: every product goes through the same generator.
 ensureProductCopy=function(){};
 const cloudCopyEditor=editor;
-editor=function(){const html=cloudCopyEditor(),request=p().copyGenerationRequest;if(location.protocol!=='https:'||!request)return html;const message=request.state==='queued'?(request.type==='seo'?'正在补充 SEO，原文案保留。':'文案与 SEO 等待负责人电脑生成，完成后会自动显示。'):request.state==='error'?'生成未完成：'+(request.error||'请重新提交'):request.state==='done'?'文案与 SEO 已生成。':'';return html.replace('<h2>Product Information</h2>','<h2>Product Information</h2><p class="muted" role="status">'+esc(message)+'</p>')};
+editor=function(){const html=cloudCopyEditor(),request=p().copyGenerationRequest;if(location.protocol!=='https:'||!request)return html;const message=['queued','running'].includes(request.state)?copyRequestStatus(request):request.state==='error'?'生成未完成：'+(request.error||'请重新提交'):request.state==='done'?'文案与 SEO 已生成。':'';return html.replace('<h2>Product Information</h2>','<h2>Product Information</h2><p class="muted" role="status">'+esc(message)+'</p>')};
 const seoRepairBind=bind;
 function queueMissingSeo(target){if(target.seoTitle&&target.seoDescription)return;target.copyGenerationRequest={id:crypto.randomUUID(),type:'seo',state:'queued',requestedAt:new Date().toISOString()};persist()}
-bind=function(){seoRepairBind();if(page!=='editor'||!admin||location.protocol!=='https:'||!localStorage.getItem('levin-record-access-v1'))return;const x=p();if(x.codexResult?.sections?.length&&(!x.seoTitle||!x.seoDescription)&&!['queued','error'].includes(x.copyGenerationRequest?.state)){queueMissingSeo(x);setTimeout(()=>{if(p()===x)render()},0)}const field=$('#compact-seoTitle'),section=field?.closest('section.card');if(section&&(!x.seoTitle||!x.seoDescription)&&!section.querySelector('#generate-seo-only')){const b=document.createElement('button');b.id='generate-seo-only';b.textContent=x.copyGenerationRequest?.state==='queued'?'SEO 生成中…':'补充 SEO';b.disabled=x.copyGenerationRequest?.state==='queued';b.onclick=()=>{queueMissingSeo(x);render()};section.prepend(b)}};
+bind=function(){seoRepairBind();if(page!=='editor'||!admin||location.protocol!=='https:'||!localStorage.getItem('levin-record-access-v1'))return;const x=p();if(x.codexResult?.sections?.length&&(!x.seoTitle||!x.seoDescription)&&!['queued','running','error'].includes(x.copyGenerationRequest?.state)){queueMissingSeo(x);setTimeout(()=>{if(p()===x)render()},0)}const field=$('#compact-seoTitle'),section=field?.closest('section.card');if(section&&(!x.seoTitle||!x.seoDescription)&&!section.querySelector('#generate-seo-only')){const b=document.createElement('button');b.id='generate-seo-only';b.textContent=['queued','running'].includes(x.copyGenerationRequest?.state)?'SEO 生成中…':'补充 SEO';b.disabled=['queued','running'].includes(x.copyGenerationRequest?.state);b.onclick=()=>{queueMissingSeo(x);render()};section.prepend(b)}};
+render();
+
+function copyRequestStatus(request){
+ const age=Date.now()-Date.parse(request.startedAt||request.requestedAt),late=age>360000;
+ if(late)return '生成服务长时间未完成。请检查负责人电脑上的生成服务，然后点击重试；原内容已保留。';
+ return request.state==='running'?'正在生成文案与 SEO，完成后自动显示。':'任务已保存，等待负责人电脑上的生成服务接收。';
+}
+const copyStateBind=bind;
+bind=function(){copyStateBind();if(page!=='editor'||location.protocol!=='https:')return;const r=p().copyGenerationRequest,b=$('#generate-product-copy');if(!r||!b)return;const pending=['queued','running'].includes(r.state),late=Date.now()-Date.parse(r.startedAt||r.requestedAt)>360000;b.disabled=pending&&!late;if(pending)b.textContent=late?'重新提交生成':r.state==='running'?'正在生成…':'等待生成服务…'};
 render();

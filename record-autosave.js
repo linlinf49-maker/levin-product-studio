@@ -21,6 +21,13 @@ async function pull(){const rows=await rpc('read_levin_records',{});let changed=
 for(const row of rows){if(!row.data||row.data.id!==row.sku)throw Error('远端产品编号不一致');const matches=products.filter(x=>x.id===row.sku&&x.updated!=='演示样例');if(matches.length>1){for(const x of matches)conflicts.add(x);status('同一编号有多份本机记录，请先核对');continue}const existing=matches[0];
 if(existing&&['id','name','description','colors','imprint'].every(k=>(existing[k]||'')===(row.data[k]||''))){
 const clean=sent.get(existing)===signature(existing);let filled=false;
+const localRequest=existing.copyGenerationRequest,remoteRequest=row.data.copyGenerationRequest;
+if(localRequest?.id&&localRequest.id===remoteRequest?.id&&JSON.stringify(localRequest)!==JSON.stringify(remoteRequest)){
+existing.copyGenerationRequest=structuredClone(remoteRequest);filled=true;
+if(remoteRequest.state==='done'){
+if(row.data.codexResult?.sections?.length)existing.codexResult=structuredClone(row.data.codexResult);
+for(const k of ['seoTitle','seoDescription','copySource','copyVersions'])if(row.data[k]!==undefined)existing[k]=structuredClone(row.data[k]);
+}}
 if(!existing.codexResult?.sections?.length&&row.data.codexResult?.sections?.length){existing.codexResult=structuredClone(row.data.codexResult);filled=true}
 for(const k of ['seoTitle','seoDescription'])if(!existing[k]&&row.data[k]){existing[k]=row.data[k];filled=true}
 if(filled){changed=true;if(clean){sent.set(existing,signature(existing));existing.sharedFingerprint=SharedStore.fingerprint(existing)}}}
