@@ -18,7 +18,13 @@ persist=function(){if(applying)return previousPersist();try{persistNow();status(
 async function rpc(name,args){const response=await fetch(cfg.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:cfg.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({p_access_key:access,...args}),signal:AbortSignal.timeout(20000)});const result=await response.json();if(!response.ok)throw Error(result.message||'同步请求失败');return result}
 function eligible(x){return /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(x.id||'')&&x.updated!=='演示样例'}
 async function pull(){const rows=await rpc('read_levin_records',{});let changed=false;
-for(const row of rows){if(!row.data||row.data.id!==row.sku)throw Error('远端产品编号不一致');const matches=products.filter(x=>x.id===row.sku&&x.updated!=='演示样例');if(matches.length>1){for(const x of matches)conflicts.add(x);status('同一编号有多份本机记录，请先核对');continue}const existing=matches[0];if(existing&&Number(existing.sharedVersion||0)>=row.version)continue;
+for(const row of rows){if(!row.data||row.data.id!==row.sku)throw Error('远端产品编号不一致');const matches=products.filter(x=>x.id===row.sku&&x.updated!=='演示样例');if(matches.length>1){for(const x of matches)conflicts.add(x);status('同一编号有多份本机记录，请先核对');continue}const existing=matches[0];
+if(existing&&['id','name','description','colors','imprint'].every(k=>(existing[k]||'')===(row.data[k]||''))){
+const clean=sent.get(existing)===signature(existing);let filled=false;
+if(!existing.codexResult?.sections?.length&&row.data.codexResult?.sections?.length){existing.codexResult=structuredClone(row.data.codexResult);filled=true}
+for(const k of ['seoTitle','seoDescription'])if(!existing[k]&&row.data[k]){existing[k]=row.data[k];filled=true}
+if(filled){changed=true;if(clean){sent.set(existing,signature(existing));existing.sharedFingerprint=SharedStore.fingerprint(existing)}}}
+if(existing&&Number(existing.sharedVersion||0)>=row.version)continue;
 if(existing&&sent.get(existing)!==signature(existing)){
  // Keep local edits, but recover missing generated output when product facts match exactly.
  const keys=['id','name','description','colors','imprint'];if(keys.every(k=>(existing[k]||'')===(row.data[k]||''))){if(!existing.codexResult?.sections?.length&&row.data.codexResult?.sections?.length){existing.codexResult=structuredClone(row.data.codexResult);changed=true}for(const k of ['seoTitle','seoDescription'])if(!existing[k]&&row.data[k]){existing[k]=row.data[k];changed=true}}
