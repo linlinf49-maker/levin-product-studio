@@ -1,6 +1,9 @@
 // One focused product workspace; existing actions and storage remain in use.
+function productListTime(x){
+for(const value of [x.createdAt,x.created_at,x.sharedUpdatedAt,x.updated]){if(!value)continue;const time=typeof value==='number'?value:Date.parse(String(value).replace(/年|月/g,'/').replace(/日/g,''));if(Number.isFinite(time))return time}return 0;
+}
 list=function(){
-const items=products.map((x,i)=>({x,i})).filter(({x})=>(x.id+' '+x.name).toLowerCase().includes(search.toLowerCase())&&(filter==='all'||x.status===filter));
+const items=products.map((x,i)=>({x,i})).filter(({x})=>(x.id+' '+x.name).toLowerCase().includes(search.toLowerCase())&&(filter==='all'||x.status===filter)).sort((a,b)=>productListTime(b.x)-productListTime(a.x)||b.i-a.i);
 return `<section class="home-workspace"><div class="home-heading"><div><h1>产品工作台</h1><p>${products.length} 条记录 <span>·</span> ${products.filter(x=>x.status==='整理中').length} 条整理中 <span>·</span> ${products.filter(x=>x.status==='已完成自查').length} 条已完成自查</p></div><div class="home-heading-actions"><button class="primary" id="new">＋ 新建产品</button><button id="workspace-more" aria-expanded="false" aria-controls="workspace-utilities">更多 ···</button></div></div>
 <div class="home-filters"><input aria-label="搜索产品" id="search" placeholder="搜索产品编号或名称" value="${esc(search)}"><select id="filter" aria-label="筛选进度"><option value="all">全部进度</option><option ${filter==='整理中'?'selected':''}>整理中</option><option ${filter==='已完成自查'?'selected':''}>已完成自查</option></select><span class="home-result-count">显示 ${items.length} 条</span></div>
 <div class="tablewrap"><table class="home-product-table"><thead><tr><th>产品名称 / SKU</th><th>当前步骤</th><th>状态</th><th>最近保存</th><th class="home-actions-heading">操作</th></tr></thead><tbody>${items.map(({x,i})=>`<tr><td class="productname"><button data-open="${i}">${esc(x.name||'未命名产品')}</button><small>${esc(x.id||'未填写编号')}</small></td><td>${esc(steps[x.step]||'资料导入')}</td><td><span class="badge">${esc(x.status||'整理中')}</span></td><td class="home-saved">${esc(x.updated||'未保存')}</td><td><div class="home-row-actions"><button data-open="${i}">继续整理 →</button><button class="danger" data-delete-product="${i}">删除</button></div></td></tr>`).join('')||'<tr><td colspan="5" class="empty">没有匹配的产品</td></tr>'}</tbody></table></div></section>
@@ -8,6 +11,7 @@ return `<section class="home-workspace"><div class="home-heading"><div><h1>产�
 };
 const homeBind=bind;
 bind=function(){homeBind();document.body.classList.toggle('products-home',page==='products');if(page!=='products')return;
+const newButton=$('#new');if(newButton){const create=newButton.onclick;newButton.onclick=function(event){const before=products.length;create.call(this,event);if(products.length>before){const x=products[products.length-1];x.createdAt=new Date().toISOString();persist()}}}
 const panel=$('#workspace-utilities'),toggle=$('#workspace-more');
 function openMore(open){panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));if(!open)toggle.focus()}
 toggle.onclick=()=>openMore(panel.hidden);$('#workspace-more-close').onclick=()=>openMore(false);
