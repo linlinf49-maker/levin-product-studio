@@ -14,8 +14,16 @@ for(const x of products){try{if(x.sharedFingerprint)sent.set(x,signature(JSON.pa
 function status(text){state=text;const e=$('#record-save-status');if(e)e.textContent=text}
 function persistNow(){localStorage.setItem(KEY,JSON.stringify(products))}
 const previousPersist=persist;
-persist=function(){if(applying)return previousPersist();try{persistNow();status(access?'已保存本机，等待同步':'已自动保存在本机')}catch{status('本机保存失败，请保留页面并检查存储空间')}};
-async function rpc(name,args){const response=await fetch(cfg.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,{method:'POST',headers:{apikey:cfg.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({p_access_key:access,...args}),signal:AbortSignal.timeout(20000)});const result=await response.json();if(!response.ok)throw Error(result.message||'同步请求失败');return result}
+persist=function(){if(applying)return previousPersist();try{persistNow();if(!access)status('未连接共享：仅保存在本机，请使用完整专用链接');else if(!busy&&!/失败|未完成|未同步|核对/.test(state))status('已保存本机，等待同步')}catch{status('本机保存失败，请保留页面并检查存储空间')}};
+let preferredTransport='direct';
+async function rpc(name,args){
+const transports={direct:{url:cfg.url.replace(/\/$/,'')+'/rest/v1/rpc/'+name,headers:{apikey:cfg.publishableKey,'Content-Type':'application/json'}},relay:cfg.rpcRelayOrigin?{url:cfg.rpcRelayOrigin+'/api/rpc/'+name,headers:{'Content-Type':'application/json'}}:null};
+const order=preferredTransport==='relay'?['relay','direct']:['direct','relay'];let failure;
+for(const route of order){const transport=transports[route];if(!transport)continue;let response,result;
+try{response=await fetch(transport.url,{method:'POST',headers:transport.headers,body:JSON.stringify({p_access_key:access,...args}),signal:AbortSignal.timeout(route==='direct'?8000:30000)});result=await response.json()}catch(e){failure=e;continue}
+if(response.status>=500){failure=Error(result.message||'共享服务暂时不可达');continue}
+if(!response.ok)throw Error(result.message||'同步请求失败');preferredTransport=route;return result}
+throw Error('共享连接失败（直连及备用通道均未完成）：'+(failure?.message||'网络不可达'))}
 function eligible(x){return /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(x.id||'')&&x.updated!=='演示样例'}
 async function pull(){const rows=await rpc('read_levin_records',{});let changed=false;
 for(const row of rows){if(!row.data||row.data.id!==row.sku)throw Error('远端产品编号不一致');const matches=products.filter(x=>x.id===row.sku&&x.updated!=='演示样例');if(matches.length>1){for(const x of matches)conflicts.add(x);status('同一编号有多份本机记录，请先核对');continue}const existing=matches[0];
@@ -63,5 +71,6 @@ const beforeBind=bind;
 bind=function(){beforeBind();const header=document.querySelector('header');if(header&&!$('#record-save-status')){const tag=document.createElement('span');tag.id='record-save-status';tag.setAttribute('role','status');tag.style.cssText='font-size:14px;color:var(--muted);margin-left:12px';header.append(tag)}status(state);for(const id of ['save','shared-push']){const b=$('#'+id);if(b)b.hidden=true}if(page==='products'&&access){const tools=$('#home-local-utilities');if(tools){const button=document.createElement('button');button.textContent='复制同事使用链接';button.onclick=async()=>{await navigator.clipboard.writeText('https://linlinf49-maker.github.io/levin-product-studio/?view=staff#workspace='+access);toast('专用链接已复制，请仅私下发给同事')};tools.append(button)}}};
 // Detect async extraction and prompt/copy changes that do not trigger DOM input events.
 setInterval(()=>{let changed=false;for(const x of products){const value=JSON.stringify(x);if(revisions.get(x)!==value){revisions.set(x,value);changed=true}}if(changed)persist();sync()},2000);
+if(!access)state='未连接共享：仅保存在本机，请使用完整专用链接';
 render();sync();
 })();
