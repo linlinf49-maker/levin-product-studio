@@ -25,6 +25,8 @@ const localRequest=existing.copyGenerationRequest,remoteRequest=row.data.copyGen
 if(localRequest?.id&&localRequest.id===remoteRequest?.id&&JSON.stringify(localRequest)!==JSON.stringify(remoteRequest)){
 existing.copyGenerationRequest=structuredClone(remoteRequest);filled=true;
 if(remoteRequest.state==='done'){
+if(remoteRequest.type==='scene'){for(const k of ['sceneVariants','sceneVariantHistory','promptRefresh'])if(row.data[k]!==undefined)existing[k]=structuredClone(row.data[k])}
+
 if(row.data.codexResult?.sections?.length)existing.codexResult=structuredClone(row.data.codexResult);
 for(const k of ['seoTitle','seoDescription','copySource','copyVersions'])if(row.data[k]!==undefined)existing[k]=structuredClone(row.data[k]);
 }}
