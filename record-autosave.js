@@ -43,16 +43,22 @@ lastPull=Date.now();if(changed){applying=true;persistNow();render();applying=fal
 async function sync(){if(!access||busy||Date.now()<retryAt||!navigator.onLine)return;busy=true;
 try{
 if(Date.now()-lastPull>15000)await pull();
-for(const x of products){if(!eligible(x)||conflicts.has(x))continue;const before=signature(x);if(sent.get(x)===before)continue;status('正在同步产品记录…');const snapshot=data(x);const answer=await rpc('save_levin_record',{p_sku:x.id,p_expected:Number(x.sharedVersion||0),p_data:snapshot,p_state:nextHandoffState(x)});const row=Array.isArray(answer)?answer[0]:answer;if(!row?.version)throw Error('同步未返回保存版本');x.sharedVersion=row.version;x.sharedUpdatedAt=row.updated_at;
-// Mark only the exact sent snapshot as synchronized. Edits made in flight stay pending.
-sent.set(x,signature(snapshot));x.sharedFingerprint=SharedStore.fingerprint({...snapshot});persistNow();}
-if(!products.some(x=>conflicts.has(x)))status('已自动同步');retryAt=0;
-}catch(e){if(/版本已变化/.test(e.message)){for(const x of products)if(eligible(x)&&sent.get(x)!==signature(x))conflicts.add(x);status('同步版本冲突，本机修改已保留，请核对')}else{retryAt=Date.now()+15000;status('已保存本机，同步未完成：'+e.message)}}finally{applying=false;busy=false}}
+const failed=[];
+for(const x of products){if(!eligible(x))continue;if(conflicts.has(x)){failed.push(x.id+'（版本待核对）');continue}const before=signature(x);if(sent.get(x)===before)continue;
+try{status('正在同步 '+x.id+'…');const snapshot=data(x);const answer=await rpc('save_levin_record',{p_sku:x.id,p_expected:Number(x.sharedVersion||0),p_data:snapshot,p_state:nextHandoffState(x)});const row=Array.isArray(answer)?answer[0]:answer;if(!row?.version)throw Error('同步未返回保存版本');x.sharedVersion=row.version;x.sharedUpdatedAt=row.updated_at;
+// A failure belongs to this record only; other products must still upload.
+sent.set(x,signature(snapshot));x.sharedFingerprint=SharedStore.fingerprint({...snapshot});persistNow();
+}catch(e){if(/版本已变化|共享记录不存在/.test(e.message))conflicts.add(x);failed.push(x.id+'（'+e.message+'）')}}
+const unnumbered=products.filter(x=>x.updated!=='演示样例'&&!eligible(x)).length;
+status(failed.length?'部分记录未同步：'+failed.slice(0,3).join('；')+'；其他产品已继续同步':unnumbered?'有 '+unnumbered+' 条记录缺少有效 SKU，仅保存在本机；其余已同步':'已自动同步');retryAt=failed.length?Date.now()+15000:0;
+}catch(e){retryAt=Date.now()+15000;status('已保存本机，同步未完成：'+e.message)}finally{applying=false;busy=false}}
+
 let pendingTimer;
 document.addEventListener('input',e=>{if(page!=='editor'||!e.target.closest('#app'))return;const target=p();clearTimeout(pendingTimer);pendingTimer=setTimeout(()=>{target.updated=new Date().toLocaleString('zh-CN');target.lastEditedAt=new Date().toISOString();persist();sync()},600)});
 document.addEventListener('change',e=>{if(page!=='editor'||!e.target.closest('#app'))return;setTimeout(()=>{persist();sync()},0)},true);
 window.addEventListener('pagehide',()=>{try{persistNow()}catch{}});
 window.addEventListener('online',()=>{retryAt=0;sync()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){retryAt=0;lastPull=0;sync()}});
 const beforeBind=bind;
 bind=function(){beforeBind();const header=document.querySelector('header');if(header&&!$('#record-save-status')){const tag=document.createElement('span');tag.id='record-save-status';tag.setAttribute('role','status');tag.style.cssText='font-size:14px;color:var(--muted);margin-left:12px';header.append(tag)}status(state);for(const id of ['save','shared-push']){const b=$('#'+id);if(b)b.hidden=true}if(page==='products'&&access){const tools=$('#home-local-utilities');if(tools){const button=document.createElement('button');button.textContent='复制同事使用链接';button.onclick=async()=>{await navigator.clipboard.writeText('https://linlinf49-maker.github.io/levin-product-studio/?view=staff#workspace='+access);toast('专用链接已复制，请仅私下发给同事')};tools.append(button)}}};
 // Detect async extraction and prompt/copy changes that do not trigger DOM input events.
